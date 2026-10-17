@@ -1,0 +1,51 @@
+name: SwiftContainer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Generate an unsigned iOS app
+        run: python3 BuildSupport/generate_xcodeproj.py . SwiftContainerBuild
+
+      - name: Archive
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project SwiftContainerBuild/App.xcodeproj \
+            -scheme App \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP="$(find "$RUNNER_TEMP/App.xcarchive/Products" -name '*.app' -print -quit)"
+          test -n "$APP"
+          rm -rf SwiftContainerBuild/Payload
+          mkdir -p SwiftContainerBuild/Payload
+          cp -R "$APP" SwiftContainerBuild/Payload/
+          rm -f SwiftContainerBuild/App.ipa
+          (cd SwiftContainerBuild && zip -qry App.ipa Payload)
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftContainerIPA
+          path: SwiftContainerBuild/App.ipa
+          if-no-files-found: error
