@@ -1,5 +1,5 @@
 <div align="center">
-   <img width="217" height="217" src="./screenshots/swiftcontainer_icon.png" alt="SwiftContainer logo">
+   <img width="217" height="217" src="./screenshots/swiftcontainer_icon.jpg" alt="SwiftContainer logo">
 </div>
    
 
