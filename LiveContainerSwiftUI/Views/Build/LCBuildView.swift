@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension NSNotification {
+extension Notification.Name {
     static let SwiftContainerAddSource = Notification.Name("SwiftContainerAddSource")
     static let SwiftContainerOpenPackage = Notification.Name("SwiftContainerOpenPackage")
 }
@@ -155,7 +155,11 @@ final class CloudBuildSession: ObservableObject {
                 branch: "main",
                 parent: parent,
                 message: parent == nil ? "Add Swift Playgrounds project" : "Update Swift Playgrounds project"
-            )
+            ) { done, total, path in
+                Task { @MainActor in
+                    self.status = "Uploading \(done) of \(total): \(path)"
+                }
+            }
             await client.useMainBranch(repo: repo.fullName)
             status = "Starting the macOS build…"
             let started = Date()

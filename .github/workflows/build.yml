@@ -32,6 +32,26 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
+      - name: Fetch OpenSSL and litehook
+        run: |
+          set -euo pipefail
+          fetch_commit() {
+            local path="$1"
+            local url="$2"
+            local sha="$3"
+            rm -rf "$path"
+            mkdir -p "$path"
+            git -C "$path" init
+            git -C "$path" remote add origin "$url"
+            git -C "$path" fetch --depth 1 origin "$sha"
+            git -C "$path" checkout --force FETCH_HEAD
+          }
+          if [ ! -f OpenSSL/Frameworks/OpenSSL.xcframework/Info.plist ]; then
+            fetch_commit OpenSSL https://github.com/krzyzanowskim/OpenSSL.git 623c84da314e85363236507ca38a4bde65df21c3
+          fi
+          if [ ! -d litehook/src ]; then
+            fetch_commit litehook https://github.com/LiveContainer/litehook.git a7e9f599d7f0b3d77008ad62bf10cb10dab6eca9
+          fi
       - name: Set Scheme
         id: scheme
         run: |

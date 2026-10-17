@@ -286,20 +286,14 @@ struct LCSettingsView: View {
                 Section {
                     HStack {
                         Image("GitHub")
-                        Button("LiveContainer upstream") {
+                        Button("SideContainer") {
                             openGitHub()
                         }
                     }
                     HStack {
-                        Image("Twitter")
-                        Button("khanhduytran0") {
-                            openTwitter()
-                        }
-                    }
-                    HStack {
                         Image("GitHub")
-                        Button("Huge_Black") {
-                            openGitHub2()
+                        Button("theccraft-git") {
+                            openGitHubAccount()
                         }
                     }
                 } header: {
@@ -460,15 +454,11 @@ struct LCSettingsView: View {
     }
     
     func openGitHub() {
-        UIApplication.shared.open(URL(string: "https://github.com/LiveContainer/LiveContainer")!)
+        UIApplication.shared.open(URL(string: "https://github.com/theccraft-git/SideContainer")!)
     }
-    
-    func openGitHub2() {
-        UIApplication.shared.open(URL(string: "https://github.com/hugeBlack")!)
-    }
-    
-    func openTwitter() {
-        UIApplication.shared.open(URL(string: "https://twitter.com/khanhduytran0")!)
+
+    func openGitHubAccount() {
+        UIApplication.shared.open(URL(string: "https://github.com/theccraft-git")!)
     }
 
     func clearNotifications() {

@@ -74,42 +74,120 @@ final class GitHubCloudClient {
         do {
             let ref: GitRef = try await send(url: api("repos/\(repo)/git/ref/heads/\(branch)"), method: "GET")
             return ref.object.sha
-        } catch let error as CloudBuildError where error.message.contains("404") {
+        } catch let error as CloudBuildError where error.message.contains("404") || Self.isEmptyRepository(error) {
             return nil
         }
     }
 
-    func publish(files: [String: Data], repo: String, branch: String, parent: String?, message: String) async throws -> String {
+    func publish(
+        files: [String: Data],
+        repo: String,
+        branch: String,
+        parent: String?,
+        message: String,
+        onProgress: (@Sendable (Int, Int, String) -> Void)? = nil
+    ) async throws -> String {
+        if parent == nil {
+            return try await publishInitialCommit(files: files, repo: repo, branch: branch, message: message, onProgress: onProgress)
+        }
+        do {
+            return try await publishUpdate(files: files, repo: repo, branch: branch, parent: parent, message: message)
+        } catch let error as CloudBuildError where Self.isEmptyRepository(error) {
+            return try await publishInitialCommit(files: files, repo: repo, branch: branch, message: message, onProgress: onProgress)
+        }
+    }
+
+    /// The Git Database API refuses to write blobs, trees, or refs until a repository has its first commit.
+    /// The Contents API is the call that creates that commit.
+    private func publishInitialCommit(
+        files: [String: Data],
+        repo: String,
+        branch: String,
+        message: String,
+        onProgress: (@Sendable (Int, Int, String) -> Void)?
+    ) async throws -> String {
+        let paths = files.keys.sorted { lhs, rhs in
+            let lhsWorkflow = lhs.contains(".github/workflows/")
+            let rhsWorkflow = rhs.contains(".github/workflows/")
+            if lhsWorkflow != rhsWorkflow { return !lhsWorkflow }
+            return lhs < rhs
+        }
+        guard !paths.isEmpty else {
+            throw CloudBuildError("The Playgrounds package has no files to upload.")
+        }
+        var lastSHA = ""
+        for (index, path) in paths.enumerated() {
+            onProgress?(index + 1, paths.count, path)
+            do {
+                lastSHA = try await putContents(
+                    repo: repo,
+                    path: path,
+                    data: files[path] ?? Data(),
+                    message: index == 0 ? message : "Add \(path)",
+                    branch: branch
+                )
+            } catch {
+                if path.contains(".github/workflows/") {
+                    throw CloudBuildError("The project files are in the repository, but GitHub rejected the build workflow. Recreate the personal token with the repo and workflow scopes. \(error.localizedDescription)")
+                }
+                throw error
+            }
+        }
+        return lastSHA
+    }
+
+    private func publishUpdate(files: [String: Data], repo: String, branch: String, parent: String?, message: String) async throws -> String {
+        guard let parent else {
+            throw CloudBuildError("Cannot update a repository that has no commits yet.")
+        }
         var tree: [[String: String]] = []
         for path in files.keys.sorted() {
             let data = files[path] ?? Data()
             let sha = try await blobSHA(repo: repo, data: data)
             tree.append(["path": path, "mode": "100644", "type": "blob", "sha": sha])
         }
-        let treeBody: [String: Any] = ["tree": tree]
-        let createdTree: GitTree = try await send(url: api("repos/\(repo)/git/trees"), method: "POST", json: treeBody, expected: [201])
-        var commitBody: [String: Any] = [
-            "message": message,
-            "tree": createdTree.sha
-        ]
-        if let parent {
-            commitBody["parents"] = [parent]
-        } else {
-            commitBody["parents"] = []
-        }
-        let commit: GitCommit = try await send(url: api("repos/\(repo)/git/commits"), method: "POST", json: commitBody, expected: [201])
-        if parent == nil {
-            let refBody: [String: Any] = ["ref": "refs/heads/\(branch)", "sha": commit.sha]
-            let _: GitRef = try await send(url: api("repos/\(repo)/git/refs"), method: "POST", json: refBody, expected: [201])
-        } else {
-            let _: GitRef = try await send(
-                url: api("repos/\(repo)/git/refs/heads/\(branch)"),
-                method: "PATCH",
-                json: ["sha": commit.sha, "force": false],
-                expected: [200]
-            )
-        }
+        let createdTree: GitTree = try await send(url: api("repos/\(repo)/git/trees"), method: "POST", json: ["tree": tree], expected: [201])
+        let commit: GitCommit = try await send(
+            url: api("repos/\(repo)/git/commits"),
+            method: "POST",
+            json: ["message": message, "tree": createdTree.sha, "parents": [parent]],
+            expected: [201]
+        )
+        let _: GitRef = try await send(
+            url: api("repos/\(repo)/git/refs/heads/\(branch)"),
+            method: "PATCH",
+            json: ["sha": commit.sha, "force": false],
+            expected: [200]
+        )
         return commit.sha
+    }
+
+    private func putContents(repo: String, path: String, data: Data, message: String, branch: String) async throws -> String {
+        let url = api("repos/\(repo)/contents/\(encodeGitPath(path))")
+        var body: [String: Any] = [
+            "message": message,
+            "content": (data.isEmpty ? Data("\n".utf8) : data).base64EncodedString(),
+            "branch": branch
+        ]
+        do {
+            let written: ContentWrite = try await send(url: url, method: "PUT", json: body, expected: [200, 201])
+            return written.commit.sha
+        } catch let error as CloudBuildError where error.message.contains("422") {
+            let existing: ContentFile = try await send(url: url, method: "GET")
+            body["sha"] = existing.sha
+            let written: ContentWrite = try await send(url: url, method: "PUT", json: body, expected: [200, 201])
+            return written.commit.sha
+        }
+    }
+
+    private func encodeGitPath(_ path: String) -> String {
+        path.split(separator: "/", omittingEmptySubsequences: false).map { segment in
+            String(segment).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String(segment)
+        }.joined(separator: "/")
+    }
+
+    private static func isEmptyRepository(_ error: CloudBuildError) -> Bool {
+        error.message.contains("409") && error.message.localizedCaseInsensitiveContains("empty")
     }
 
     func useMainBranch(repo: String) async {
@@ -183,7 +261,8 @@ final class GitHubCloudClient {
         )
         var components = URLComponents(url: URL(string: "https://uploads.github.com/repos/\(repo)/releases/\(release.id)/assets")!, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "name", value: "App.ipa")]
-        let asset: GitAsset = try await send(url: components.url!, method: "POST", body: ipa, contentType: "application/octet-stream", expected: [201])
+        let assetData = try await sendData(url: components.url!, method: "POST", body: ipa, contentType: "application/octet-stream", expected: [201])
+        let asset = try JSONDecoder().decode(GitAsset.self, from: assetData)
         return asset.browserDownloadURL
     }
 
@@ -325,6 +404,11 @@ private struct GitHubMessage: Decodable { let message: String }
 private struct GitBlob: Decodable { let sha: String }
 private struct GitTree: Decodable { let sha: String }
 private struct GitCommit: Decodable { let sha: String }
+private struct ContentFile: Decodable { let sha: String }
+private struct ContentWrite: Decodable {
+    struct Commit: Decodable { let sha: String }
+    let commit: Commit
+}
 private struct GitRef: Decodable {
     let object: Object
     struct Object: Decodable { let sha: String }

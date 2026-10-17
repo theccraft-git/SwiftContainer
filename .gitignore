@@ -1,4 +1,5 @@
 .theos/
+.git/
 packages/
 .DS_Store
 *.xcscmblueprint
