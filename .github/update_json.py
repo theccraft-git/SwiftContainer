@@ -136,19 +136,45 @@ def update_json_file_release(repo_url, json_file, latest_release):
         print(f"Error writing to JSON file: {e}")
         raise
 
-def update_json_file_nightly(json_file, nightly_release):
-    if isinstance(nightly_release, list) and nightly_release:
-        nightly_release = next((item for item in nightly_release if item["tag_name"] == "nightly"), None)
+def load_nightly_source(json_file):
+    if os.path.isfile(json_file):
+        with open(json_file, "r") as file:
+            return json.load(file)
+
+    print(f"{json_file} is missing. Creating it from .github/apps.json.")
+    with open("./.github/apps.json", "r") as file:
+        data = json.load(file)
+    data["name"] = "SwiftContainer (nightly)"
+    data["identifier"] = "com.livecontainer.source.nightly"
+    data["subtitle"] = "SwiftContainer (nightly) official AltStore Source."
+    data["description"] = "This is the official AltStore Source for SwiftContainer (nightly).\n\n Run iOS apps without actually installing them!"
+    data["news"] = []
+    app = data["apps"][0]
+    app["name"] = "SwiftContainer (nightly)"
+    app["beta"] = True
+    app["versions"] = app["versions"][:1]
+    return data
+
+def ipa_download(release, name, repo_url):
+    if release:
+        for asset in release.get("assets", []):
+            if asset["name"] == name:
+                return asset["browser_download_url"], asset["size"]
+    local_path = name
+    if os.path.isfile(local_path):
+        return f"https://github.com/{repo_url}/releases/download/nightly/{name}", os.path.getsize(local_path)
+    return None, None
+
+def update_json_file_nightly(json_file, nightly_release, repo_url):
+    if isinstance(nightly_release, list) and nightly_release and nightly_release[0]:
+        nightly_release = nightly_release[0]
     else:
-        print("Error getting nightly release")
-        return
+        nightly_release = None
 
     try:
-        with open(json_file, "r") as file:
-            data = json.load(file)
-    except json.JSONDecodeError as e:
+        data = load_nightly_source(json_file)
+    except (json.JSONDecodeError, OSError) as e:
         print(f"Error reading JSON file: {e}")
-        data = {"apps": []}
         raise
 
     app = data["apps"][0]
@@ -156,31 +182,25 @@ def update_json_file_nightly(json_file, nightly_release):
     with open("LiveContainer/Info.plist", 'rb') as infile:
         info_plist = plistlib.load(infile)
     full_version = info_plist["CFBundleVersion"]
-    tag = nightly_release["tag_name"]
     version = re.search(r"(\d+\.\d+\.\d+)", full_version).group(1)
-    version_date = nightly_release["published_at"]
-    date_obj = datetime.strptime(version_date, "%Y-%m-%dT%H:%M:%SZ")
+    if nightly_release and nightly_release.get("published_at"):
+        version_date = nightly_release["published_at"]
+    else:
+        version_date = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     nightly_link = os.environ.get("NIGHTLY_LINK", "")
     commit_sha = os.environ.get("commit_sha", "")[:7]
     commit_msg = os.environ.get("commit_msg", "").strip()
 
     description = f"""\
-Nightly build from [{commit_sha}](https://github.com/LiveContainer/LiveContainer/commit/{commit_sha}):\
+Nightly build from [{commit_sha}](https://github.com/{repo_url}/commit/{commit_sha}):\
  {commit_msg}
 
 This is a nightly release [created automatically with GitHub Actions workflow]({nightly_link}).
 """
     description = prepare_description(description)
 
-    assets = nightly_release.get("assets", [])
-    download_url = None
-    size = None
-    for asset in assets:
-        if asset["name"] == "SwiftContainer.ipa":
-            download_url = asset["browser_download_url"]
-            size = asset["size"]
-            break
+    download_url, size = ipa_download(nightly_release, "SwiftContainer.ipa", repo_url)
 
     if download_url is None or size is None:
         print("Error: IPA file not found in release assets.")
@@ -226,15 +246,16 @@ def update_json_file_release_ss_lc(repo_url, json_file, latest_release, is_night
         print("Error getting latest release")
         return
 
+    data = None
     try:
         apps_json_url = f"https://github.com/{repo_url}/releases/download/1.0/apps_ss_lc.json"
         response = requests.get(apps_json_url)
         response.raise_for_status()
         data = response.json()
-    except json.JSONDecodeError as e:
-        print(f"Error reading JSON file: {e}")
-        data = {"apps": []}
-        raise
+    except (requests.RequestException, json.JSONDecodeError) as e:
+        print(f"Could not read the published SideStore source ({e}). Using .github/apps_ss_lc.json.")
+        with open(json_file, "r") as file:
+            data = json.load(file)
 
     app = data["apps"][0]
 
@@ -251,17 +272,10 @@ def update_json_file_release_ss_lc(repo_url, json_file, latest_release, is_night
     commit_msg = os.environ.get("commit_msg", "").strip()
 
     description = f"""\
-Nightly build from [{commit_sha}](https://github.com/LiveContainer/LiveContainer/commit/{commit_sha}):\
+Nightly build from [{commit_sha}](https://github.com/{repo_url}/commit/{commit_sha}):\
  {commit_msg}
     """
-    assets = latest_release.get("assets", [])
-    download_url = None
-    size = None
-    for asset in assets:
-        if asset["name"] == f"LiveContainer+SideStore.ipa":
-            download_url = asset["browser_download_url"]
-            size = asset["size"]
-            break
+    download_url, size = ipa_download(latest_release, "SwiftContainer+SideStore.ipa", repo_url)
 
     if download_url is None or size is None:
         print("Error: IPA file not found in release assets.")
@@ -332,14 +346,14 @@ Nightly build from [{commit_sha}](https://github.com/LiveContainer/LiveContainer
 
 
 def main():
-    repo_url = "LiveContainer/LiveContainer"
+    repo_url = os.environ.get("GITHUB_REPOSITORY") or "LiveContainer/LiveContainer"
     is_nightly = "NIGHTLY_LINK" in os.environ
 
     try:
         fetched_data_latest = fetch_latest_release(repo_url, is_nightly)
         if is_nightly:
             json_file = "./.github/apps_nightly.json"
-            update_json_file_nightly(json_file, fetched_data_latest)
+            update_json_file_nightly(json_file, fetched_data_latest, repo_url)
             update_json_file_release_ss_lc(repo_url, "./.github/apps_ss_lc.json", fetched_data_latest, True)
         else:
             json_file = "./.github/apps.json"
