@@ -73,14 +73,14 @@ find payloadlc/Payload -type d -name "_CodeSignature" -exec rm -r {} +
 ldid -S.github/sidelc/LiveWidgetExtension_adhoc.xml ./Payload/LiveContainer.app/PlugIns/LiveWidgetExtension.appex/LiveWidgetExtension
 
 # package full IPA
-zip -r "${ipa_name:-SwiftContainer}+SideStore.ipa" "Payload" -x "._*" -x ".DS_Store" -x "__MACOSX"
+zip -r "${ipa_name:-SwiftContainer}+SwiftStore.ipa" "Payload" -x "._*" -x ".DS_Store" -x "__MACOSX"
 
 # package 2-AppID variant (keep LiveProcess.appex only)
 rm -rf ./Payload/LiveContainer.app/PlugIns/LiveWidgetExtension.appex
 rm -rf ./Payload/LiveContainer.app/PlugIns/ShareExtension.appex
 rm -rf ./Payload/LiveContainer.app/PlugIns/LaunchAppExtension.appex
-zip -r "${ipa_name:-SwiftContainer}+SideStore-2AppID.ipa" "Payload" -x "._*" -x ".DS_Store" -x "__MACOSX"
+zip -r "${ipa_name:-SwiftContainer}+SwiftStore-2AppID.ipa" "Payload" -x "._*" -x ".DS_Store" -x "__MACOSX"
 
 # package 1-AppID variant (remove all extensions)
 rm -rf ./Payload/LiveContainer.app/PlugIns/LiveProcess.appex
-zip -r "${ipa_name:-SwiftContainer}+SideStore-1AppID.ipa" "Payload" -x "._*" -x ".DS_Store" -x "__MACOSX"
+zip -r "${ipa_name:-SwiftContainer}+SwiftStore-1AppID.ipa" "Payload" -x "._*" -x ".DS_Store" -x "__MACOSX"
