@@ -1,232 +1,102 @@
 <div align="center">
-   <img width="217" height="217" src="./screenshots/swiftcontainer_icon.jpg" alt="SwiftContainer logo">
+   <img width="217" height="217" src="./screenshots/swiftcontainer_icon.png" alt="SwiftContainer logo">
 </div>
-   
 
 <div align="center">
   <h1><b>SwiftContainer</b></h1>
-  <p><i>A SwiftStore app launcher that runs iOS apps without actually installing them.</i></p>
+  <p><i>A SwiftStore app launcher. It runs iOS apps inside one host app, and it can turn an exported Swift Playgrounds package into an installed app in one pass.</i></p>
 </div>
-<h6 align="center">
 
-Crowdin Project: [![Crowdin](https://badges.crowdin.net/livecontainer/localized.svg)](https://crowdin.com/project/livecontainer) &nbsp;| &nbsp; Documentation:[liveconainer.github.io](https://livecontainer.github.io/docs/intro)
+SwiftContainer is based on [LiveContainer](https://github.com/LiveContainer/LiveContainer). It is a launcher, not an emulator. Guest apps run as the SwiftContainer process, so they share its app ID, entitlements, and certificate.
 
-# SwiftContainer
+This fork changes two things on top of that launcher: the app is rebranded in the SwiftStore orange theme, and a Create tab takes an exported `.swiftpm` package through GitHub Actions and installs the result on the device without a Mac.
 
-- SwiftContainer is an app launcher (not emulator or hypervisor) that allows you to run iOS apps inside it.
-- Allows you to install unlimited apps (3 app/10 app id free developer account limit does not apply here) with only one app & app id. You can also have multiple versions of an app installed with multiple data containers.
-- (Below iOS 26) When JIT is available, codesign is entirely bypassed, no need to sign your apps before installing. Otherwise, your app will be signed with the same certificate used by SwiftContainer.
-- SwiftContainer uses the SwiftStore look: black surfaces and an orange-to-coral accent, matching the swift-and-padlock mark.
+## What changed from LiveContainer
 
-> [!CAUTION]
-> **Important Notice Regarding Third-Party Builds of SwiftContainer**
->
-> We have recently noticed the appearance of certain closed-source third-party builds of SwiftContainer. Please be aware that all your apps are installed within SwiftContainer, which means these third-party builds **have full access to your data, including sensitive information such as keychain items and login credentials**. 
-> 
-> Furthermore, please note that we do not provide any support for issues of these third-party builds.
+**Orange SwiftStore rebrand.** The display name is SwiftContainer. Icons, accent, badges, banners, and AltStore source tint use the SwiftStore orange (`#FF5C25` in the app, `#FF5C24` in sources): a geometric swift facing right, with an open padlock cut out of the lower wing, on black. Settings, share sheet, and source copy use the new name.
 
+The internal identity is unchanged so existing shortcuts and extra copies keep working. The bundle ID is still `com.kdt.livecontainer`, the URL scheme is still `livecontainer`, and the executable inside the IPA is still `LiveContainer`. A second and third copy are labeled SwiftContainer 2 and SwiftContainer 3, while their bundles stay `LiveContainer2` and `LiveContainer3`.
 
-# Installation
-**SwiftContainer comes with a standalone version and a version with built-in SideStore. [Please read the install guide here](https://livecontainer.github.io/docs/installation)**
+**A `.swiftpm` installs in one go.** LiveContainer only installs IPA files you already built. SwiftContainer treats an exported Swift Playgrounds package as an app to build. Open a `.swiftpm` from Files, or import it on the Create tab. One **Build and install** action then:
 
-If you encounter any issue please [read our FAQ here](https://livecontainer.github.io/docs/faq)
+1. Creates or reuses a private GitHub repository named from the package.
+2. Uploads the package plus a macOS Actions workflow.
+3. Waits while a GitHub-hosted Mac runs `xcodebuild` and produces an unsigned IPA.
+4. Downloads that IPA.
+5. Signs it on the device with the certificate already stored in Settings.
+6. Installs it into the Apps list.
 
-### Standalone 
-<table>
-<tr>
-<td>
-Stable
-</td>
-<td>
-<a href="https://stikstore.app/altdirect/?url=https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps.json&exclude=livecontainer" target="_blank">
-   <img src="https://raw.githubusercontent.com/StikStore/altdirect/refs/heads/main/assets/png/AltSource_Blue.png" alt="Add AltSource" width="200"/>
-</a>
-</td>
-<td>
-<a href="https://github.com/LiveContainer/LiveContainer/releases/latest/download/LiveContainer.ipa" target="_blank">
-   <img src="https://raw.githubusercontent.com/StikStore/altdirect/refs/heads/main/assets/png/Download_Blue.png" alt="Download .ipa" width="200"/>
-</a>
-</td>
-</tr>
-<tr>
-<td>
-Nightly
-</td>
-<td>
-<a href="https://stikstore.app/altdirect/?url=https://github.com/LiveContainer/LiveContainer/releases/download/nightly/apps_nightly.json&exclude=livecontainer" target="_blank">
-   <img src="https://raw.githubusercontent.com/StikStore/altdirect/refs/heads/main/assets/png/AltSource_Blue.png" alt="Add AltSource" width="200"/>
-</a>
-</td>
-<td>
-<a href="https://github.com/LiveContainer/LiveContainer/releases/download/nightly/LiveContainer.ipa" target="_blank">
-   <img src="https://raw.githubusercontent.com/StikStore/altdirect/refs/heads/main/assets/png/Download_Blue.png" alt="Download .ipa" width="200"/>
-</a>
-</td>
-</tr>
-</table>
+You do not export an Xcode project, archive on a Mac, or run a separate signer. GitHub sign-in and a signing certificate are set up once. After that, each package is one action from import to installed app.
 
-### SwiftContainer+SideStore
-|Stable|Nightly|
-|:-:|:-:|
-|<a href="https://github.com/LiveContainer/LiveContainer/releases/latest/download/LiveContainer+SideStore.ipa" target="_blank"><img src="https://raw.githubusercontent.com/StikStore/altdirect/refs/heads/main/assets/png/Download_Blue.png" alt="Download .ipa" width="200" /></a>|<a href="https://github.com/LiveContainer/LiveContainer/releases/download/nightly/LiveContainer+SideStore.ipa" target="_blank"><img src="https://raw.githubusercontent.com/StikStore/altdirect/refs/heads/main/assets/png/Download_Blue.png" alt="Download .ipa" width="200" /></a>|
+Apple ID credentials stay in the local signer. They are not uploaded with the project. Code is pushed only to a private repository on the signed-in GitHub account.
 
+**SwiftInstaller is not in this app.** A separate bootstrap that installs SwiftContainer and can then be deleted is a future project. Nothing in this repository implements it.
 
-## Requirements
+## How it runs apps
 
-- iOS/iPadOS 15+
-   + Multitasking requires iOS/iPadOS 16.0+
-- AltStore 2.0+ / SideStore 0.6.0+
+SwiftContainer is installed once, with one app ID. Every guest app lives in a container inside it, so the free developer limit of 3 or 10 app IDs does not apply to those guests. The same app can have several data containers.
 
+On launch, SwiftContainer picks the selected guest and:
 
-# Features & Guides
+1. Patches the guest Mach-O so dyld will load it. `__PAGEZERO` is moved to `0xFFFFC000` with a size of `0x4000`, `MH_EXECUTE` becomes `MH_DYLIB`, and a load command pulls in `TweakLoader.dylib`.
+2. Hooks `_NSGetExecutablePath` so the process reports the guest executable path.
+3. Replaces `NSBundle.mainBundle` with the guest bundle.
+4. `dlopen`s the guest executable, lets TweakLoader inject the selected tweaks, finds the entry point, and jumps to it. The guest calls `UIApplicationMain` and runs like a normal iOS app.
 
-### Installing Apps
-- Open SwiftContainer, tap the plus icon in the upper right hand corner and select IPA files to install.
-- Choose the app you want to open in the next launch.
-- You can long-press the app to manage it.
+Below iOS 26, JIT can skip codesign entirely, so a guest does not have to be signed before install. Without JIT, the guest is signed with the same certificate as SwiftContainer. On iOS 26 and later, signing is required.
 
-### [Add Apps to Home Screen](https://livecontainer.github.io/docs/guides/add-to-home-screen)
+Each container of an app can get its own keychain access group. The host declares 128 groups and assigns them so separate containers of the same app do not share keychain items.
 
-### [Multiple SwiftContainers](https://livecontainer.github.io/docs/guides/multiple-livecontainers)
-Using multiple SwiftContainers allows you to run multiples different apps simultaneously, with *almost* seamless data transfer between the SwiftContainers.
+What the host cannot do for a guest:
 
-### [Multitasking](https://livecontainer.github.io/docs/guides/multitask)
-You can now launch multiple apps simultaneously in in-app virtual windows. These windows can be resized, scaled, and even displayed using the native Picture-in-Picture (PiP) feature. On iPads, apps can run in native window mode, displaying each app in a separate system window. And if you wish, you can choose to run apps in multitasking mode by default in settings.
+- Guest entitlements are not applied. Sideloaded apps usually only need the host’s basic entitlements.
+- Permissions (camera, photos, and so on) are the host’s permissions.
+- Guest containers are not sandboxed from each other.
+- App extensions inside a guest cannot be registered with SpringBoard.
+- Remote push does not work.
+- Several apps at once need either the in-app multitasking windows (iOS 16+) or another installed copy of SwiftContainer.
 
-To use multitasking, hold its banner and tap **"Multitask"**. You can also make Multitask the default launch mode in settings.
+## How a Playgrounds package becomes an app
 
->[!Note]
->1. To use multitasking, ensure you select **"Keep App Extensions"** when installing via SideStore/AltStore.  
->2. If you want to enable JIT for multitasked apps, you’ll need a JIT enabler that supports attaching by PID. (StikDebug)
+The Create tab is the new path. It expects a Swift Playgrounds app exported as a `.swiftpm` folder, or a zip that contains one.
 
-### [JIT Support](https://livecontainer.github.io/docs/guides/jit-support)
-### [Installing external tweaks](https://livecontainer.github.io/docs/guides/tweaks)
-### [Multiple Containers/External Containers](https://livecontainer.github.io/docs/guides/containers-and-external-data)
-### [Hiding Apps](https://livecontainer.github.io/docs/guides/lock-app)
+Sign in once with a GitHub OAuth device code, or paste a personal access token that has the `repo` and `workflow` scopes. The token stays in the device keychain. Import a signing certificate in Settings the same way LiveContainer does. SwiftContainer uses that certificate and does not implement its own Apple ID login.
 
-### Fix File Picker & Local Notification
-Some apps may experience issues with their file pickers or not be able to apply for notification permission in SwiftContainer. To resolve this, enable "Fix File Picker" & "Fix Local Notifications" accordingly in the app-specific settings.
+When you tap **Build and install**:
 
-### "Open In App" Support
-- You can simply share a URL or a file to app simply by using iOS's native share sheet. In share sheet, select SwiftContainer, and SwiftContainer will ask you which app you'd like to open that URL/file in.
-- What's more, you also can tap the link icon in the top-right corner of the "Apps" tab and input the URL. SwiftContainer will detect the appropriate app and ask if you want to launch it.
+- The package’s `Package.swift` supplies the display name, bundle ID, and iOS version.
+- SwiftContainer writes those sources into a private repo, together with `BuildSupport/generate_xcodeproj.py` and `.github/workflows/swiftcontainer.yml`.
+- The workflow turns the package into an unsigned iOS app project and archives it with `xcodebuild`. Code signing is disabled on the runner.
+- The artifact is downloaded, optionally attached to a private GitHub release, written to a temporary file, and handed to the existing IPA installer.
+- The installer signs with the on-device certificate and adds the app to the Apps tab.
 
-## Compatibility
-Unfortunately, not all apps work in SwiftContainer, so we have a [compatibility list](https://github.com/LiveContainer/LiveContainer/labels/compatibility) to tell if there is apps that have issues. If they aren't on this list, then it's likely going run. However, if it doesn't work, please make an [issue](https://github.com/LiveContainer/LiveContainer/issues/new/choose) about it.
+A free GitHub account includes 2,000 Actions minutes per month. macOS runners count at 10×, which is typically 15 to 20 builds. A compile usually takes 2 to 5 minutes. The Create tab shows the account’s remaining Actions quota when GitHub returns it.
 
-## Building
-Open Xcode, edit `DEVELOPMENT_TEAM[config=Debug]` in `xcconfigs/Global.xcconfig` to your team id and compile.
+The same screen can copy the repository URL and an AltStore/SideStore `source.json` link, or add that source inside SwiftContainer. Another person can use the source only if they can read the repository. There is no central SwiftContainer server.
 
-## Project structure
-### Main executable
-- Core of SwiftContainer
-- Contains the logic of setting up guest environment and loading guest app.
-- If no app is selected, it loads SwiftContainerSwiftUI.
+Opening a `.swiftpm` from Files switches straight to Create and loads that package, instead of trying to install the folder as an IPA.
 
-### SwiftContainerSwiftUI
-- SwiftUI rewrite of SwiftContainerUI (by @hugeBlack)
-- Language file `Localizable.xcstrings` is in here for multilingual support. To help us translate SwiftContainer, please visit [our crowdin project](https://crowdin.com/project/livecontainer)
+## Installing and using the launcher
 
-### MultitaskSupport
-- Contains the implementation of multitasking feature.
-- Based on [FrontBoardAppLauncher](https://github.com/khanhduytran0/FrontBoardAppLauncher)
+Requirements are iOS or iPadOS 15 or later, and AltStore 2.0+ or SideStore 0.6.0+. Multitasking needs iOS 16 or later.
 
-### SideStore
-- Supporting code for SideStore's app refreshing integration
+Install an IPA from the plus button on the Apps tab, then long-press its banner to manage it. Home screen shortcuts, multiple copies, multitasking windows, JIT, tweak injection, extra data containers, and app hiding behave as they do in LiveContainer. Those guides still apply: [installation](https://livecontainer.github.io/docs/installation), [home screen](https://livecontainer.github.io/docs/guides/add-to-home-screen), [multiple copies](https://livecontainer.github.io/docs/guides/multiple-livecontainers), [multitasking](https://livecontainer.github.io/docs/guides/multitask), [JIT](https://livecontainer.github.io/docs/guides/jit-support), [tweaks](https://livecontainer.github.io/docs/guides/tweaks), [containers](https://livecontainer.github.io/docs/guides/containers-and-external-data).
 
-### TweakLoader
-- A simple tweak injector, which loads CydiaSubstrate and loads tweaks.
-- Injected to every app you install in SwiftContainer.
+Some guests need **Fix File Picker** or **Fix Local Notifications** in their own settings. To hand a file or URL to a guest, use the system share sheet and pick SwiftContainer, or use the link button on the Apps tab.
 
-### ZSign
-- The app signer shipped with SwiftContainer.
-- Originally made by [zhlynn](https://github.com/zhlynn/zsign).
-- SwiftContainer uses [Feather's](https://github.com/khcrysalis/Feather) version of ZSign modified by khcrysalis.
-- Changes are made to meet SwiftContainer's needs.
+CI publishes `SwiftContainer.ipa`, plus `SwiftContainer+SideStore.ipa` and the 2-AppID and 1-AppID SideStore variants. To build locally, set `DEVELOPMENT_TEAM[config=Debug]` in `xcconfigs/Global.xcconfig` to your team ID and archive the `LiveContainer` scheme in Xcode. That scheme name is the Xcode target. The packaged file is still named `SwiftContainer.ipa`.
 
-## How does it work?
+## Project layout
 
-### Patching guest executable
-- Patch `__PAGEZERO` segment:
-  + Change `vmaddr` to `0xFFFFC000` (`0x100000000 - 0x4000`)
-  + Change `vmsize` to `0x4000`
-- Change `MH_EXECUTE` to `MH_DYLIB`.
-- Inject a load command to load `TweakLoader.dylib`
-
-### Patching `@executable_path`
-- Hook `dyld4::APIs::_NSGetExecutablePath`
-- Call `_NSGetExecutablePath`
-- Replace `config.process.mainExecutablePath`
-  - Calculate address of `config.process.mainExecutablePath` using `dyld4::APIs` instance (passed as first parameter)
-  - Use `builtin_vm_protect` or TPRO unlock to make it writable
-  - Replace the address with one we have control of
-- Put the original `dyld4::APIs::_NSGetExecutablePath` back
-
-> Old Method
->- Call `_NSGetExecutablePath` with an invalid buffer pointer input -> SIGSEGV
->- Do some [magic stuff](https://github.com/khanhduytran0/LiveContainer/blob/5ef1e6a/main.m#L74-L115) to overwrite the contents of executable_path.
-
-### Patching `NSBundle.mainBundle`
-- This property is overwritten with the guest app's bundle.
-
-### Bypassing Library Validation
-- JIT is optional to bypass codesigning. In JIT-less mode, all executables are signed so this does not apply.
-- Derived from [Restoring Dyld Memory Loading](https://blog.xpnsec.com/restoring-dyld-memory-loading)
-
-### dlopening the executable
-- Call `dlopen` with the guest app's executable
-- TweakLoader loads all tweaks in the selected folder
-- Find the entry point
-- Jump to the entry point
-- The guest app's entry point calls `UIApplicationMain` and start up like any other iOS apps.
-
-### Multi-Account support & Keychain Semi-Separation
-[128 keychain access groups](./entitlements.xml) are created and SwiftContainer allocates them randomly to each container of the same app. So you can create 128 container with different keychain access groups.
-
-## Limitations
-- Entitlements from the guest app are not applied to the host app. This isn't a big deal since sideloaded apps requires only basic entitlements.
-- App Permissions are globally applied.
-- Guest app containers are not sandboxed. This means one guest app can access other guest apps' data.
-- App extensions aren't supported. they cannot be registered because: SwiftContainer is sandboxed, SpringBoard doesn't know what apps are installed in SwiftContainer, and they take up App ID.
-- Multitasking can be achieved by using multiple SwiftContainer and the multitasking feature. However, while we were able to fix physical keyboard input issue on iPadOS (https://github.com/LiveContainer/LiveContainer/issues/524), iPhone Mirroring uses different checks which still broke it (https://github.com/LiveContainer/LiveContainer/issues/793).
-- Remote push notification will not work
-- Querying custom URL schemes might not work(?)
-
-## SwiftInstaller
-
-SwiftInstaller is a future SwiftStore project. It is not part of this app, and none of its installer workflow is implemented here.
-
-## Cloud build
-
-SwiftContainer can turn an exported Swift Playgrounds `.swiftpm` package into an installed app without a Mac.
-
-1. Open the **Create** tab and sign in to GitHub with an OAuth device code, or paste a token that has the `repo` and `workflow` scopes.
-2. Import the `.swiftpm` package.
-3. SwiftContainer pushes it to a **private** repository on that account, including a GitHub Actions workflow.
-4. A macOS runner compiles an unsigned IPA with `xcodebuild`.
-5. SwiftContainer downloads the IPA and signs it on the device with the certificate imported in Settings.
-
-The repository link and an AltStore/SideStore `source.json` can be copied from the same tab. Other people can use that source only if they can read the GitHub repository.
-
-Free GitHub accounts include 2,000 Action minutes per month. macOS runners use a 10× multiplier, which is typically 15 to 20 builds. Compilation usually takes 2 to 5 minutes.
-
-Apple ID credentials stay with the local signer. They are not uploaded with the project.
-
-## TODO
-- Use ChOma instead of custom MachO parser
+- **Main executable.** Sets up the guest environment and loads the selected app. With no app selected, it shows the SwiftUI interface.
+- **LiveContainerSwiftUI.** The SwiftUI interface, including the Create tab (`LCBuildView`, `GitHubCloudClient`, `PlaygroundPackage`). Strings live in `Localizable.xcstrings`.
+- **MultitaskSupport.** In-app windows, based on [FrontBoardAppLauncher](https://github.com/khanhduytran0/FrontBoardAppLauncher).
+- **TweakLoader.** Injected into every guest. Loads CydiaSubstrate and the selected tweaks.
+- **ZSign.** On-device signer, from [zhlynn/zsign](https://github.com/zhlynn/zsign) via [Feather](https://github.com/khcrysalis/Feather)’s fork.
+- **SideStore support.** Refresh integration and the SideStore-bundled IPA variants.
 
 ## License
-[GNU Affero General Public License v3.0](https://github.com/LiveContainer/LiveContainer/blob/main/LICENSE)
 
-## Credits
-- [xpn's blogpost: Restoring Dyld Memory Loading](https://blog.xpnsec.com/restoring-dyld-memory-loading)
-- [LinusHenze's CFastFind](https://github.com/pinauten/PatchfinderUtils/blob/master/Sources/CFastFind/CFastFind.c): [MIT license](https://github.com/pinauten/PatchfinderUtils/blob/master/LICENSE)
-- [litehook](https://github.com/opa334/litehook): [MIT license](https://github.com/opa334/litehook/blob/main/LICENSE)
-- @haxi0 & @m1337v for icon
-- @Vishram1123 for the initial shortcut implementation.
-- @hugeBlack for SwiftUI contribution
-- @Staubgeborener for automatic AltStore/SideStore source updater
-- @fkunn1326 for improved app hiding
-- @slds1 for dynamic color feature
-- @Vishram1123 for iOS 26+ JIT Script Support
-- @StephenDev0 for AltStore source support
+[GNU Affero General Public License v3.0](./LICENSE)
+
+SwiftContainer is a modified LiveContainer. Launcher behavior that this README does not restate comes from that project and its contributors, including the dyld loading approach described in [Restoring Dyld Memory Loading](https://blog.xpnsec.com/restoring-dyld-memory-loading), [litehook](https://github.com/opa334/litehook), and [CFastFind](https://github.com/pinauten/PatchfinderUtils).
