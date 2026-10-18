@@ -22,9 +22,9 @@ jobs:
       scheme: ${{ steps.scheme.outputs.scheme }}
       archive_path: ${{ env.archive_path }}
       artifact: ${{ env.ipa_name }}.ipa
-      artifact2: ${{ env.ipa_name }}+SideStore.ipa
-      artifact_2appid: ${{ env.ipa_name }}+SideStore-2AppID.ipa
-      artifact_1appid: ${{ env.ipa_name }}+SideStore-1AppID.ipa
+      artifact2: ${{ env.ipa_name }}+SwiftStore.ipa
+      artifact_2appid: ${{ env.ipa_name }}+SwiftStore-2AppID.ipa
+      artifact_1appid: ${{ env.ipa_name }}+SwiftStore-1AppID.ipa
     steps:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -99,23 +99,23 @@ jobs:
           name: ${{ env.ipa_name }}.ipa
           path: ${{ env.ipa_name }}.ipa
       
-      - name: Upload SwiftContainer+SideStore
+      - name: Upload SwiftContainer+SwiftStore
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ipa_name }}+SideStore.ipa
-          path: ${{ env.ipa_name }}+SideStore.ipa
+          name: ${{ env.ipa_name }}+SwiftStore.ipa
+          path: ${{ env.ipa_name }}+SwiftStore.ipa
 
-      - name: Upload SwiftContainer+SideStore-2AppID
+      - name: Upload SwiftContainer+SwiftStore-2AppID
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ipa_name }}+SideStore-2AppID.ipa
-          path: ${{ env.ipa_name }}+SideStore-2AppID.ipa
+          name: ${{ env.ipa_name }}+SwiftStore-2AppID.ipa
+          path: ${{ env.ipa_name }}+SwiftStore-2AppID.ipa
 
-      - name: Upload SwiftContainer+SideStore-1AppID
+      - name: Upload SwiftContainer+SwiftStore-1AppID
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ipa_name }}+SideStore-1AppID.ipa
-          path: ${{ env.ipa_name }}+SideStore-1AppID.ipa
+          name: ${{ env.ipa_name }}+SwiftStore-1AppID.ipa
+          path: ${{ env.ipa_name }}+SwiftStore-1AppID.ipa
 
   release__nightly:
     name: Nightly Release
